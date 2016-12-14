@@ -23,6 +23,8 @@ contract FundingHub {
     return db.nameToProject[key];
   }
 
+  // TODO: Remove project if refund/payout from DS?
+
   // *******************
   //    Constructor
   function FundingHub(uint currentTimeUnixTimestamp) {
@@ -49,9 +51,9 @@ contract FundingHub {
                          returns (address) 
   {
     uint deadlineBlockchainTimestamp = toBCTime(deadlineUnixTimestamp);
-    address projectAddress = new Project (owner, targetFundingWei, deadlineBlockchainTimestamp);
+    address projectAddress = new Project(owner, targetFundingWei, deadlineBlockchainTimestamp);
 
-    Project project = Project(projectAddress);
+    Project project = getProjectDB(projectAddress);
 
     insertProjectDB(projectDB_, projectAddress, project);
 
@@ -66,13 +68,12 @@ contract FundingHub {
     isAddressValid(contributor)
     returns (bool)
   {
-    Project p = getProjectDB(projectAddress);
-    bool projectExist = p.exists();
+    Project project = Project(projectAddress);
 
-    if (projectExist)
-      p.fund(contributor, msg.value);
+    if (project.exists())
+      project.fund(contributor, msg.value);
 
-    return projectExist;
+    return project.exists();
   }
 
   // *****************
