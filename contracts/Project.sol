@@ -1,9 +1,6 @@
-pragma solidity ^0.4.2;
+pragma solidity ^0.4.6;
 
 // FundingHub is the registry of all Projects to be funded. FundingHub should have a constructor and the following functions:
-
-// TODO: How will tihs work??
-function toTimestamp(uint16 year, uint8 month, uint8 day, uint8 hour) constant returns (uint timestamp);
 
 // TODO: What to do after payout/refund?
 // a Leave Project as is
@@ -13,26 +10,45 @@ function toTimestamp(uint16 year, uint8 month, uint8 day, uint8 hour) constant r
 contract Project {
 
   // *******************
-  // Types
+  //      Types
 
   // Iterable map. Add only. Unique addresses.
   // TODO: Change names in data type below
   struct ContributorsFunds {
     mapping (address => uint) contributorToFunds;
-    address[] indexedcontributors;
+    address[] indexedContributors;
   }
 
-  function addFundsToContributor(ContributorsFunds d, address contrib, uint funds) private {
+
+  function addFundsToContributor(ContributorsFunds storage d, address contrib, uint funds) private {
     bool isNew = d.contributorToFunds[contrib] == 0;
 
     if (isNew) 
-      d.contributorIndexes.push(contrib)
+      d.indexedContributors.push(contrib);
 
     d.contributorToFunds[contrib] = d.contributorToFunds[contrib] + funds;
   }
 
+  // TODO: param f: (address addr, uint funds)
+  function mapContributorFunds ( ContributorsFunds storage d
+                               , function (address, uint) f)
+    private
+  {
+    uint i;
+    uint end = d.indexedContributors.length; 
+    uint funds;
+    address addr;
+
+    for (i = 0; i < end; i++) {
+      addr = d.indexedContributors[i];
+      funds = d.contributorToFunds[addr];
+
+      f(addr, funds);
+    }
+  }
+
   // *******************
-  // Variables
+  //      Storage
   uint private deadline_;
   address private owner_;
   uint private targetFundsWei_;
@@ -43,14 +59,10 @@ contract Project {
   // Public functions
   function Project ( address owner
                    , uint targetFundingWei
-                   , uint16 endYear
-                   , uint8 endMonth
-                   , uint8 endDay
-                   , uint8 endHour)
+                   , uint deadlineBlockchainTimestamp)
     isAddressValid(owner)
   {
-    deadline_ = toTimestamp(endYear, endMonth, endDay, endHour);
-    // DateTime.sol 0x1a6184cd4c5bea62b0116de7962ee7315b7bcbce
+    deadline_ = deadlineBlockchainTimestamp;
   }
 
   // Called when FundingHub gets contribution (fn: contribute)
@@ -59,8 +71,7 @@ contract Project {
     isEnoughFunds(fundsWei)
   {
     bool metGoal = (fundsWei + totalFundsWei_) >= targetFundsWei_;
-    // TODO: get current time
-    bool atTimeLimit = currentTime >= deadline_;
+    bool atTimeLimit = block.timestamp >= deadline_;
     uint leftOverFunds = metGoal ? fundsWei + totalFundsWei_ - targetFundsWei_
                                  : 0;
 
@@ -89,17 +100,7 @@ contract Project {
 
   // sends all individual contributions back to the respective contributor
   function refund() {
-    uint i;
-    uint end = d.indexedContributors.length; 
-    uint funds;
-    address addr;
-
-    for (i = 0; i < end; i++) {
-      addr = d.indexedContributors[i];
-      funds = d.contributorToFunds[addr];
-
-      sendTo(addr, funds);
-    }
+    mapContributorFunds(contributorsDB_, sendTo);
     // TODO:   PUT EVENT HERE STATING WHAT WAS/WASN't SEND BACK'; AMEN
   }
 
@@ -110,13 +111,14 @@ contract Project {
   // ***********************
   // Helper functions
   function sendTo(address recipient, uint bal) private {
-    if (bal == 0) return;
+    if (bal == 0) return;                // NOTE: Consider optimization of removing this line during a map.
     if (!recipient.send(bal)) throw;
   }
 
+  
   // ***********************
   // Modifiers
-  modifier isValidAddress (address recipient) {
+  modifier isAddressValid (address recipient) {
     if (recipient == 0) throw;
     _;
   }
@@ -124,7 +126,7 @@ contract Project {
   modifier isEnoughFunds (uint funds) {
     if (funds == 0) throw;
     _;
-
+  }
   
 }
 

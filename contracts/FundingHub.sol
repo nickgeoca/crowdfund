@@ -1,18 +1,11 @@
-pragma solidity ^0.4.2;
+pragma solidity ^0.4.6;
 
 import "Project.sol";
 
-// FundingHub is the registry of all Projects to be funded. FundingHub should have a constructor and the following functions:
 
 // TODO:  In Truffle, create a migration script that calls the createProject function after FundingHub has been deployed.
 
 contract FundingHub {
-
-
-  function FundingHub(uint ) {
-    
-  }
-
   // ******************
   //      Types
   // Iterable map. Add only. Unique addresses.
@@ -21,19 +14,29 @@ contract FundingHub {
     address[] addressesIndexed;
   }
 
-  function insertProjectDB (ProjectDB db, address key, Project p) private {
+  function insertProjectDB (ProjectDB storage db, address key, Project p) private {
     db.nameToProject[key] = p;
-    db.namesIndexed.push(key);
+    db.addressesIndexed.push(key);
   }
 
-  function getProjectDB (ProjectDB db, address key) private returns (Project) {
+  function getProjectDB (ProjectDB storage db, address key) private returns (Project) {
     return db.nameToProject[key];
   }
 
   // *******************
-  //      Variables
-  ProjectDB private projectDB_;
+  //    Constructor
+  function FundingHub(uint currentTimeUnixTimestamp) {
+    if (currentTimeUnixTimestamp < block.timestamp) throw; // NOTE: Could cause problems way in future
+    diff_UnixTime_BCTime_ = int(currentTimeUnixTimestamp) - int(block.timestamp);
+  }
   
+  // *******************
+  //      Storage
+  ProjectDB private projectDB_;
+  int diff_UnixTime_BCTime_;
+  
+  // *****************
+  // Public functions
 
   // This function:
   //   * allows a user to add a new project to the FundingHub. 
@@ -42,18 +45,12 @@ contract FundingHub {
   function createProject ( string name
                          , address owner
                          , uint targetFundingWei
-                         , uint16 endYear
-                         , uint8 endMonth
-                         , uint8 endDay
-                         , uint8 endHour) returns (address) 
+                         , uint deadlineUnixTimestamp)
+                         returns (address) 
   {
-    address projectAddress = new
-      Project ( owner
-              , targetFundingWei
-              , endYear
-              , endMonth
-              , endDay
-              , endHour);
+    uint deadlineBlockchainTimestamp = toBCTime(deadlineUnixTimestamp);
+    address projectAddress = new Project (owner, targetFundingWei, deadlineBlockchainTimestamp);
+
     Project project = Project(projectAddress);
 
     insertProjectDB(projectDB_, projectAddress, project);
@@ -65,16 +62,31 @@ contract FundingHub {
   //  * allows users to contribute to a Project identified by its address
   //  * contribute calls the fund() function in the individual Project contract. All funding passes thru
   function contribute(address projectAddress, address contributor)
-    isValidAddress(projectAddress)
-    isValidAddress(contributor)
+    isAddressValid(projectAddress)
+    isAddressValid(contributor)
     returns (bool)
   {
     Project p = getProjectDB(projectAddress);
-    bool projectExist = p.exists()
+    bool projectExist = p.exists();
 
     if (projectExist)
       p.fund(contributor, msg.value);
 
     return projectExist;
+  }
+
+  // *****************
+  // Private functions
+  function toUnixTime(uint bcTimestamp) private returns (uint) {
+    return bcTimestamp + diff_UnixTime_BCTime_;    
+  }
+
+  function toBCTime(uint unixTimestamp) private returns (uint) {
+    return unixTimestamp - diff_UnixTime_BCTime_;
+  }
+
+  modifier isAddressValid (address recipient) {
+    if (recipient == 0) throw;
+    _;
   }
 }
