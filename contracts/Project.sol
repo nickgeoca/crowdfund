@@ -66,14 +66,17 @@ contract Project {
   }
 
   // Called when FundingHub gets contribution (fn: contribute)
+  // Returns if project ended or not
   function fund(address contributor, uint fundsWei)
     isAddressValid(contributor)
     isEnoughFunds(fundsWei)
+    returns (bool)
   {
     bool metGoal = (fundsWei + totalFundsWei_) >= targetFundsWei_;
     bool atTimeLimit = block.timestamp >= deadline_;
     uint leftOverFunds = metGoal ? fundsWei + totalFundsWei_ - targetFundsWei_
                                  : 0;
+    bool projectEnd = metGoal | atTimeLimit;
 
     // Send any leftovers back and add contribution 
     sendTo(contributor, leftOverFunds);
@@ -83,6 +86,8 @@ contract Project {
       payout();
     else if (atTimeLimit)
       refund();
+
+    return projectEnd;
   }
 
   // Sends all funds received to owner of the project

@@ -10,17 +10,40 @@ contract FundingHub {
   //      Types
   // Iterable map. Add only. Unique addresses.
   struct ProjectDB {
-    mapping (address => Project) nameToProject;
-    address[] addressesIndexed;
+    mapping (address => uint) addressToIndex;
+    address[] indexedAddresses;
   }
 
-  function insertProjectDB (ProjectDB storage db, address key, Project p) private {
-    db.nameToProject[key] = p;
-    db.addressesIndexed.push(key);
+  function isMemberProjectDB (ProjectDB storage db, Project project) private returns (bool) {
+    address addr = address(project);
+    uint index = db.addressToIndex[addr];
+    return db.indexedAddresses[index] == addr;
   }
 
-  function getProjectDB (ProjectDB storage db, address key) private returns (Project) {
-    return db.nameToProject[key];
+  function insertProjectDB (ProjectDB storage db, Project project) private {
+    address addr = address(project);
+    uint index = db.indexedAddresses.length;
+
+    db.addressToIndex[addr] = index;
+    db.indexedAddresses.push(addr);
+  }
+
+  function deleteProjectDB (ProjectDB storage db, Project project) private {
+    address removeAddr = address(project);
+    uint removeIndex = db.addressToIndex[removeAddr];
+    uint keepIndex = db.indexedAddresses.length - 1;
+    address keepAddr = db.indexedAddresses[keepIndex];
+
+    if (db.indexedAddresses.length == 0) throw;
+    if (!isMemberProjectDB(db, project)) throw;
+
+    // Update index and address's index
+    db.addressToIndex[keepAddr] = removeIndex;
+    db.indexedAddresses[removeIndex] = keepAddr;
+
+    // TODO: Delete contract here too
+    delete db.addressToIndex[removeAddr];
+    db.indexedAddresses.length = db.indexedAddresses.length - 1; // TODO: Make sure this works!
   }
 
   // TODO: Remove project if refund/payout from DS?
@@ -53,9 +76,9 @@ contract FundingHub {
     uint deadlineBlockchainTimestamp = toBCTime(deadlineUnixTimestamp);
     address projectAddress = new Project(owner, targetFundingWei, deadlineBlockchainTimestamp);
 
-    Project project = getProjectDB(projectAddress);
+    Project project = Project(projectAddress);
 
-    insertProjectDB(projectDB_, projectAddress, project);
+    insertProjectDB(projectDB_, project);
 
     return projectAddress;
   }
@@ -69,21 +92,26 @@ contract FundingHub {
     returns (bool)
   {
     Project project = Project(projectAddress);
+    bool isValid = isMemberProjectDB(projectDB_, project);
+    bool projectEnd;
 
-    if (project.exists())
-      project.fund(contributor, msg.value);
+    if (!isValid) return isValid;  // TODO: Better naming here?
 
-    return project.exists();
+    projectEnd = project.fund(contributor, msg.value);
+    if (projectEnd)
+      deleteProjectDB(projectDB_, project);
   }
 
   // *****************
   // Private functions
   function toUnixTime(uint bcTimestamp) private returns (uint) {
-    return bcTimestamp + diff_UnixTime_BCTime_;    
+    if (int(bcTimestamp) < diff_UnixTime_BCTime_) throw;
+    return uint(int(bcTimestamp) + diff_UnixTime_BCTime_);    
   }
 
   function toBCTime(uint unixTimestamp) private returns (uint) {
-    return unixTimestamp - diff_UnixTime_BCTime_;
+    if (int(unixTimestamp) < diff_UnixTime_BCTime_) throw;
+    return uint(int(unixTimestamp) - diff_UnixTime_BCTime_);    
   }
 
   modifier isAddressValid (address recipient) {
