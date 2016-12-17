@@ -1,6 +1,6 @@
 pragma solidity ^0.4.6;
 
-import "Project.sol";
+// import "Project.sol";
 
 
 // TODO:  In Truffle, create a migration script that calls the createProject function after FundingHub has been deployed.
@@ -8,6 +8,7 @@ import "Project.sol";
 contract FundingHub {
   // ******************
   //      Types
+
   // Iterable map. Add only. Unique addresses.
   struct ProjectDB {
     mapping (address => uint) addressToIndex;
@@ -58,7 +59,7 @@ contract FundingHub {
   // *******************
   //      Storage
   ProjectDB private projectDB_;
-  int diff_UnixTime_BCTime_;
+  int private diff_UnixTime_BCTime_;
   
   // *****************
   // Public functions
@@ -67,8 +68,7 @@ contract FundingHub {
   //   * allows a user to add a new project to the FundingHub. 
   //   * deploys a new Project contract and keep track of its address.
   //   * accept all constructor values that the Project contract requires.
-  function createProject ( string name
-                         , address owner
+  function createProject ( address owner
                          , uint targetFundingWei
                          , uint deadlineUnixTimestamp)
                          returns (address) 
@@ -104,11 +104,14 @@ contract FundingHub {
 
   // *****************
   // Private functions
+
+  // y = f(x) = x + (y - x)
   function toUnixTime(uint bcTimestamp) private returns (uint) {
     if (int(bcTimestamp) < diff_UnixTime_BCTime_) throw;
     return uint(int(bcTimestamp) + diff_UnixTime_BCTime_);    
   }
 
+  // x = f(y) = y - (y - x)
   function toBCTime(uint unixTimestamp) private returns (uint) {
     if (int(unixTimestamp) < diff_UnixTime_BCTime_) throw;
     return uint(int(unixTimestamp) - diff_UnixTime_BCTime_);    
@@ -118,4 +121,152 @@ contract FundingHub {
     if (recipient == 0) throw;
     _;
   }
+}
+////////////////////////////////////////////////////////
+// FundingHub is the registry of all Projects to be funded. FundingHub should have a constructor and the following functions:
+
+
+// TODO: Put Project in own file 
+
+// TODO: What to do after payout/refund?
+// a Leave Project as is
+// b Kill Project
+// c Delete mappings
+
+contract Project {
+
+  // *******************
+  //      Types
+
+  // Iterable map. Add only. Unique addresses.
+  // TODO: Change names in data type below
+  struct ContributorsFunds {
+    mapping (address => uint) contributorToFunds;
+    address[] indexedContributors;
+  }
+
+
+  function addFundsToContributor(ContributorsFunds storage d, address contrib, uint funds) private {
+    bool isNew = d.contributorToFunds[contrib] == 0;
+
+    if (isNew) 
+      d.indexedContributors.push(contrib);
+
+    d.contributorToFunds[contrib] = d.contributorToFunds[contrib] + funds;
+  }
+
+  // TODO: param f: (address addr, uint funds)
+  function mapContributorFunds ( ContributorsFunds storage d
+                               , function (address, uint) f)
+    private
+  {
+    uint i;
+    uint end = d.indexedContributors.length; 
+    uint funds;
+    address addr;
+
+    for (i = 0; i < end; i++) {
+      addr = d.indexedContributors[i];
+      funds = d.contributorToFunds[addr];
+
+      f(addr, funds);
+    }
+  }
+
+  // *******************
+  //      Storage
+  uint private deadline_;
+  address private owner_;
+  address private fundhubAddress_;
+  uint private targetFundsWei_;
+  uint private totalFundsWei_;  
+  ContributorsFunds private contributorsDB_;
+
+  function Project ( address owner
+                   , uint targetFundingWei
+                   , uint deadlineBlockchainTimestamp)
+    isFundingHubAddress(msg.sender)
+    isAddressValid(owner)
+  {
+    fundhubAddress_ = msg.sender;
+    deadline_ = deadlineBlockchainTimestamp;
+  }
+
+  // *****************
+  // Public functions
+
+  // Called when FundingHub gets contribution (fn: contribute)
+  // Returns if project ended or not
+  function fund(address contributor, uint fundsWei)
+    isFundingHubAddress(msg.sender)
+    isAddressValid(contributor)
+    isEnoughFunds(fundsWei)
+    returns (bool)
+  {
+    bool metGoal = (fundsWei + totalFundsWei_) >= targetFundsWei_;
+    bool atTimeLimit = block.timestamp >= deadline_;
+    uint leftOverFunds = metGoal ? fundsWei + totalFundsWei_ - targetFundsWei_  // Rectify
+                                 : 0;   
+    bool projectEnd = metGoal || atTimeLimit;
+
+    // Send any leftovers back and add contribution 
+    sendTo(contributor, leftOverFunds);
+    addFundsToContributor(contributorsDB_, contributor, fundsWei - leftOverFunds);
+
+    if (metGoal)
+      payout();
+    else if (atTimeLimit)
+      refund();
+
+    return projectEnd;
+  }
+  // TODO: End project. selfdestruct etc
+  function getProjectInfo () returns (address fundinghub, address owner, int secondsToDeadline, uint targetFunds, uint totalFunds) {
+    return (fundhubAddress_, owner_, int(deadline_) - int(now), targetFundsWei_, totalFundsWei_);
+  }
+
+  // ***********************
+  // Helper functions
+  // Sends all funds received to owner of the project
+  function payout() private {
+    sendTo(owner_, this.balance);
+    // TODO: PUT EVENT HERE 
+  }
+
+  /*
+    NOTE: HOW DOES ONE SEND ALL CONTRIBUTIONS BACK IF EXPENSIVE?
+    a. Unlucky guy's gotta pay a lot
+    b. this contract uses some funding
+    c. if no one does it, owner of contract does it
+  */
+
+  // sends all individual contributions back to the respective contributor
+  function refund() private {
+    mapContributorFunds(contributorsDB_, sendTo);
+    // TODO:   PUT EVENT HERE STATING WHAT WAS/WASN't SEND BACK'; AMEN
+  }
+
+  function sendTo(address recipient, uint bal) private {
+    if (bal == 0) return;                // NOTE: Consider optimization of removing this line during a map.
+    if (!recipient.send(bal)) throw;
+  }
+
+  
+  // ***********************
+  // Modifiers
+  modifier isAddressValid (address addr) {
+    if (addr == 0) throw;
+    _;
+  }
+
+  modifier isEnoughFunds (uint funds) {
+    if (funds == 0) throw;
+    _;
+  }
+
+  modifier isFundingHubAddress (address addr) {
+    if (addr != fundhubAddress_) throw;
+    _;
+  }
+  
 }
