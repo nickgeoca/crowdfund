@@ -2,11 +2,11 @@
 <html>
 
 <head>
-  <title>MetaCoin - Default Truffle App</title>
+  <title>FundingHub</title>
   <base href="." />
   <link href='https://fonts.googleapis.com/css?family=Open+Sans:400,700' rel='stylesheet' type='text/css'>
   <link href="./app.css" rel='stylesheet' type='text/css'>
-  <script src="./web3.js"></script>
+  <script src="./app.js"></script>
   <script src="./fundingHub.js"></script>
 </head>
 <body ng-app="fundingHubApp" ng-controller="fundingHubController">
@@ -18,7 +18,7 @@
   <br><label for="ownerAddress">Project Owner Address:</label><input type="text" id="ownerAddress" ng-model="ownerAddress" placeholder="e.g., 0x93e66d9baea28c17d9fc393b53e3fbdd76899dae"></input>
   <br><label for="targetFunding">Target Funding (ether):</label><input type="text" id="targetFunding" ng-model="targetFunding" placeholder="e.g., 4.5"></input>
   <br><label for="deadlineUnixTimeStamp">Deadline (unix timestamp):</label><input type="text" id="deadlineUnixTimeStamp" ng-model="deadlineUnixTimeStamp" placeholder="e.g., 1481756685"></input>
-  Project Address: <span id="projectAddress">{{ projectAddress }}</span>
+  <br>Project Address: <span id="projectAddress">{{ projectAddress }}</span>
 
   <br><br><button id="browse-projects" ng-click="browseProjects(fundhubAddress)">Browse Projects</button>
 
@@ -26,7 +26,7 @@
   <br><label for="projectAddress">Project Address:</label><input type="text" id="projectAddress" ng-model="projectAddress" placeholder="e.g., 0x93e66d9baea28c17d9fc393b53e3fbdd76899dae"></input>
 
   <br><br>
-  <span id="status">{{ status }}</span>
-  Check for errors in this area of index.html.
+  <span id="userStatus">{{ userStatus }}</span>
+  <br><br>Check for errors in this area of index.html.
 </body>
 </html>

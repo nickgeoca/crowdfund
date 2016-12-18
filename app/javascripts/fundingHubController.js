@@ -1,6 +1,4 @@
 var app = angular.module('fundingHubApp', []);
-var Web3 = require('web3');
-var web3 = new Web3();
 
 app.config(function ($locationProvider) {
   $locationProvider.html5Mode(true);
@@ -10,7 +8,7 @@ app.controller("fundingHubController", [ '$scope', '$location', '$http', '$q', '
   $scope.accounts = [];
   $scope.account = "";
   $scope.projectAddress = "N/A";
-  $scope.status = "";
+  $scope.userStatus = "";
 
   $window.onload = function () {
 
@@ -32,23 +30,28 @@ app.controller("fundingHubController", [ '$scope', '$location', '$http', '$q', '
     });
   }
 
-  $scope.createProject = function (fundhubAddress, ownerAddress, targetFunding, deadlineUnixTimestamp) {
-    var fundhub = FundingHub(fundhubAddress); // TODO: Fix this fukin line for krist sayks
-
+  $scope.createProject = function (fundhubAddress, ownerAddress, targetFundingEther, deadlineUnixTimestamp) {
+    var c_fh = FundingHub.deployed();
+    console.log('TODO: Use fundhubAddress');
     console.log('TODO: How to assure params are valid/not-null??');        
     console.log('TODO: fix toWei thing');        
     console.log('What does the $timeout function do? Where to use/not-use it...');
-    $scope.status = 'Creating project...';
+    console.log('Project address:' + c_fh.address);
+    $scope.userStatus = 'Creating project...';
 
-    fundhub.createProject(ownerAddress, toWei(targetFunding), deadlineUnixTimestamp, {from: $scope.account}).then(function(addr) {
-      $scope.status = 'Transaction complete!';
-      $scope.setProjectAddress = addr;
-      console.log('Project Address: ' + addr); 
-    }).catch(function(e) {
-      console.log(e);
-      setStatus("Error creating project; see log.");
-    });
-
+    
+    c_fh.createProject(ownerAddress,  web3.toWei(targetFundingEther), deadlineUnixTimestamp, {from: $scope.account})
+      .then(function(addr) {
+        pAddr = addr.valueOf();
+        console.log('Project Address: ' + pAddr); 
+        $timeout(function () {
+          $scope.userStatus = 'Transaction complete!';
+          $scope.projectAddress = pAddr;
+        });
+      }).catch(function(e) {
+        console.log(e);
+        $scope.userStatus = ("Error creating project; see log.");
+      })
   }
 
 }]);
@@ -56,18 +59,3 @@ app.controller("fundingHubController", [ '$scope', '$location', '$http', '$q', '
 // Create
 // browse
 // contribute
-
-/*
-
-    var meta = MetaCoin.deployed();
-  meta.getBalance.call($scope.account, {from: $scope.account})
-        .then(function(value) {
-            $timeout(function () {
-                $scope.balance = value.valueOf();
-            });
-        }).catch(function(e) {
-          console.log(e);
-          $scope.status = 'Error getting balance; see log.';
-        });
-  };
-*/

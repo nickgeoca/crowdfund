@@ -74,9 +74,8 @@ contract FundingHub {
                          returns (address) 
   {
     uint deadlineBlockchainTimestamp = toBCTime(deadlineUnixTimestamp);
-    address projectAddress = new Project(owner, targetFundingWei, deadlineBlockchainTimestamp);
-
-    Project project = Project(projectAddress);
+    Project project = new Project(owner, targetFundingWei, deadlineBlockchainTimestamp);
+    address projectAddress = address(project);
 
     insertProjectDB(projectDB_, project);
 

@@ -1,9 +1,9 @@
 module.exports = {
   build: {
     "index.html": "index.html",
-    "web3.js": [
-      'javascripts/web3.js'
-    ],  
+    "app.js": [
+      "javascripts/app.js"
+    ],
     "fundingHub.js": [
       "javascripts/_vendor/angular.js",
       "javascripts/fundingHubController.js"
