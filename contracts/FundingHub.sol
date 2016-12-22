@@ -1,4 +1,4 @@
-pragma solidity ^0.4.6;
+pragma solidity 0.4.6;
 
 // import "Project.sol";
 
@@ -52,10 +52,9 @@ contract FundingHub {
   // *******************
   //    Constructor
   function FundingHub(uint currentTimeUnixTimestamp) {
-    if (currentTimeUnixTimestamp < block.timestamp) throw; // NOTE: Could cause problems way in future
     diff_UnixTime_BCTime_ = int(currentTimeUnixTimestamp) - int(block.timestamp);
   }
-  
+
   // *******************
   //      Storage
   ProjectDB private projectDB_;
@@ -64,6 +63,9 @@ contract FundingHub {
   // *****************
   // Public functions
 
+  //event E_newProject(address indexed projectOwner, address projectAddress);
+  event E_newProject(address yo);
+
   // This function:
   //   * allows a user to add a new project to the FundingHub. 
   //   * deploys a new Project contract and keep track of its address.
@@ -71,24 +73,25 @@ contract FundingHub {
   function createProject ( address owner
                          , uint targetFundingWei
                          , uint deadlineUnixTimestamp)
-                         returns (address) 
+                         returns (address)
+  // TODO: Check owner is valid address
   {
     uint deadlineBlockchainTimestamp = toBCTime(deadlineUnixTimestamp);
     Project project = new Project(owner, targetFundingWei, deadlineBlockchainTimestamp);
-    address projectAddress = address(project);
 
     insertProjectDB(projectDB_, project);
-
-    return projectAddress;
+    E_newProject(project);
+    return project;
   }
 
   // This function
   //  * allows users to contribute to a Project identified by its address
   //  * contribute calls the fund() function in the individual Project contract. All funding passes thru
   function contribute(address projectAddress, address contributor)
+    payable
     isAddressValid(projectAddress)
     isAddressValid(contributor)
-    returns (bool)
+    returns (bool contribution)
   {
     Project project = Project(projectAddress);
     bool isValid = isMemberProjectDB(projectDB_, project);
@@ -99,6 +102,8 @@ contract FundingHub {
     projectEnd = project.fund(contributor, msg.value);
     if (projectEnd)
       deleteProjectDB(projectDB_, project);
+
+    return isValid;
   }
 
   // *****************
@@ -184,7 +189,6 @@ contract Project {
   function Project ( address owner
                    , uint targetFundingWei
                    , uint deadlineBlockchainTimestamp)
-    isFundingHubAddress(msg.sender)
     isAddressValid(owner)
   {
     fundhubAddress_ = msg.sender;

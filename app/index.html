@@ -22,11 +22,11 @@
 
   <br><br><button id="browse-projects" ng-click="browseProjects(fundhubAddress)">Browse Projects</button>
 
-  <br><br><button id="contribute-project" ng-click="contribute(fundhubAddress, projectAddress, amount)">Contribute Project</button>
+  <br><br><button id="contribute-project" ng-click="contribute(fundhubAddress, projectAddress, contributionEither)">Contribute Project</button>
   <br><label for="projectAddress">Project Address:</label><input type="text" id="projectAddress" ng-model="projectAddress" placeholder="e.g., 0x93e66d9baea28c17d9fc393b53e3fbdd76899dae"></input>
+  <br><label for="contributionEither">Contribution Funding (ether):</label><input type="text" id="contributionEither" ng-model="contributionEither" placeholder="e.g., 4.5"></input>
 
   <br><br>
   <span id="userStatus">{{ userStatus }}</span>
-  <br><br>Check for errors in this area of index.html.
 </body>
 </html>
