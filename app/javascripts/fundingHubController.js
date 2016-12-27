@@ -121,34 +121,40 @@ app.controller("fundingHubController", [ '$scope', '$location', '$http', '$q', '
 
     c_fh.browse() 
           .then(function(projects) {
-            projects.map(function(pAddr) {
+            infoProjects = projects.map(function(pAddr) {
               var p = Project.at(pAddr);
-              p.getProjectInfo().then(function(tup) {
-                [fundHubAddr, ownerAddr, secondsToDeadline, targetFundsWei, totalFundsWei] = tup;
-                var targetFundsEther = web3.fromWei(targetFundsWei, 'ether').toString(10);                    
-                var totalFundsEther = web3.fromWei(totalFundsWei, 'ether').toString(10);                    
+              return p.getProjectInfo();
+            });
+// <qswz> then foos.map((fi, i)=>[fi, bars[i]]) // zip
+            return Promise.all(infoProjects).map(function(info, i){ return [projects[i]].concat(info);});  
+          })
+          .then(function (infoProjects){
+              infoProjects.map( function (tup){
+                [projectAddr, fundHubAddr, ownerAddr, secondsToDeadline, targetFundsWei, totalFundsWei] = tup;
+                var targetFundsEther = web3.fromWei(targetFundsWei, 'ether').toString(10);
+                var totalFundsEther = web3.fromWei(totalFundsWei, 'ether').toString(10);
                 var deadline = secondsToDeadline.plus(Math.floor(Date.now() / 1000));
                 deadline = 1000 * deadline;
                 deadline = new Date(deadline);
                 deadline = deadline.toString();
 
                 console.log('--------------------------------');
-                console.log('Project Address: ' + pAddr);  
+                console.log('Project Address: ' + projectAddr);  
                 console.log(' - FundHub Address: ' + fundHubAddr);
                 console.log(' - Owner Address: ' + ownerAddr);
                 console.log(' - Deadline: ' + deadline);
                 console.log(' - Target Funding: ' + targetFundsEther);
-                console.log(' - Total Funding: ' + totalFundsEther);
-
-                return true;
-              }).catch(errorFunction);
-            });
+                console.log(' - Total Funding: ' + totalFundsEther);                               
+              });
             $timeout(function () {
-              $scope.userStatus = projects.length + ' projects listed in console!';
+              $scope.userStatus = infoProjects.length + ' projects listed in console!';
             });
-          }).catch(errorFunction);
+          })
+          .catch(errorFunction);
+              // Promise.resolve(1).then(x => Promise.all([x, x+1])).then(([a,b])=>a+b).then(console.log)
     }                             
 
 }]);
 
+// TODO: Get this to work on mist wallet?
 // TODO: Sort out r/w project address in ui
