@@ -4,6 +4,13 @@ app.config(function ($locationProvider) {
   $locationProvider.html5Mode(true);
 });
 
+var errorFunction = function(e) {
+    console.log(e);
+    $timeout(function () {
+        $scope.userStatus = ("Error contributing project; see log.");
+    });
+}
+
 app.controller("fundingHubController", [ '$scope', '$location', '$http', '$q', '$window', '$timeout', function($scope , $location, $http, $q, $window, $timeout) {
   $scope.accounts = [];
   $scope.account = "";
@@ -26,8 +33,10 @@ app.controller("fundingHubController", [ '$scope', '$location', '$http', '$q', '
         return;
       }
 
-      $scope.accounts = accs;
-      $scope.account = $scope.accounts[0];
+      $timeout(function () {  
+        $scope.accounts = accs;
+        $scope.account = $scope.accounts[0];
+      });
       console.log('TODO: this format: a1-balance1 .. a2-balance2 .. etc');  
     });
   }
@@ -35,20 +44,24 @@ app.controller("fundingHubController", [ '$scope', '$location', '$http', '$q', '
 
   $scope.createProject = function (fundhubAddress, ownerAddress, targetFundingEther, deadlineUnixTimestamp) {
 
-    // NOTE: This could be problem in future if watches never happen
+    // TODO: For all events, problem if watches never happen (memory leak)
 
-    // {projectOwner: ownerAddress});
-    c_fh.E_newProject().watch(function (error, result) {
-      // this.stopWatching();
+    c_fh.E_createProject().watch(function (error, result) {
+      // this.stopWatching(); TODO: maybe get this working?
       if (error) {
         console.log(error);
-        $scope.userStatus = ("Error contributing project; see log.");
+        $timeout(function () {
+          $scope.userStatus = ("Error contributing project; see log.");
+        });
         return;
       }
 
-      pAddr = result['args']['yo'];
-      $scope.userStatus = 'Transaction complete & project address fetched!';
-      $scope.projectAddress = pAddr.valueOf();
+      // projectOwner   = result['args']['projectOwner'];
+      projectAddress = result['args']['projectAddress'];
+      $timeout(function () {
+        $scope.userStatus = 'Transaction complete!';
+        $scope.projectAddress = projectAddress;
+      });
     });
 
     console.log('TODO: Use fundhubAddress -- ' + "myContractInstance = MyContract.at('0x78e97bcc5b5dd9ed228fed7a4887c0d7287344a9');");
@@ -60,12 +73,9 @@ app.controller("fundingHubController", [ '$scope', '$location', '$http', '$q', '
       .then(function(txAddr) {
         console.log('Transaction Address: ' + txAddr); 
         $timeout(function () {
-          $scope.userStatus = 'Transaction complete.... getting project address.';
+          $scope.userStatus = '...getting project address.'; // TODO: This is out of order w/ transaction complete
         });
-      }).catch(function(e) {
-        console.log(e);
-        $scope.userStatus = ("Error creating project; see log.");
-      })
+      }).catch(errorFunction);
   }
 
   $scope.contribute = function (fundhubAddress, projectAddress, amountEither) {
@@ -74,22 +84,71 @@ app.controller("fundingHubController", [ '$scope', '$location', '$http', '$q', '
     console.log('FundingHub Address:' + c_fh.address);
     $scope.userStatus = 'Contributing project...';
 
-    c_fh.contribute(projectAddress, $scope.account, {from: $scope.account, value: web3.toWei(amountEither)})
-      .then(function(success) {
-        success = success.valueOf();
-        console.log('Contribution was success-' + success); 
+    c_fh.E_contribute().watch(function (error, result) {
+      // this.stopWatching(); TODO: maybe get this working?
+      if (error) {
+        console.log(error);
         $timeout(function () {
-          $scope.userStatus = 'Transaction complete! Contribution success?' + success;
+          $scope.userStatus = ("Error contributing project; see log.");
         });
-      }).catch(function(e) {
-        console.log(e);
-        $scope.userStatus = ("Error contributing project; see log.");
-      })
+        return;
+      }
+
+        
+      contributionSuccessful = result['args']['contributionSuccessful'];
+      var msg_ = contributionSuccessful ? 'successful!' : 'failed!';
+      var msg  = 'Contribution to ' + projectAddress + ' - ' + msg_;
+      $timeout(function () {
+        $scope.userStatus = msg;
+      });
+      console.log(msg);
+    });
+
+    c_fh.contribute(projectAddress, $scope.account, {from: $scope.account, value: web3.toWei(amountEither), gas:1000000})
+      .then(function(txAddr) {
+        console.log('Transaction Address: ' + txAddr); 
+        $timeout(function () {
+          $scope.userStatus = 'Checking if contribution sucessful...';
+        });
+      }).catch(errorFunction);
   }
 
+  $scope.browseProjects = function (fundhubAddress) {
+    console.log('TODO: Use fundhubAddress');
+    console.log('TODO: How to assure params are valid/not-null??');        
+    console.log('FundingHub Address:' + c_fh.address);
+    $scope.userStatus = 'Getting projects...';
+
+    c_fh.browse() 
+          .then(function(projects) {
+            projects.map(function(pAddr) {
+              var p = Project.at(pAddr);
+              p.getProjectInfo().then(function(tup) {
+                [fundHubAddr, ownerAddr, secondsToDeadline, targetFundsWei, totalFundsWei] = tup;
+                var targetFundsEther = web3.fromWei(targetFundsWei, 'ether').toString(10);                    
+                var totalFundsEther = web3.fromWei(totalFundsWei, 'ether').toString(10);                    
+                var deadline = secondsToDeadline.plus(Math.floor(Date.now() / 1000));
+                deadline = 1000 * deadline;
+                deadline = new Date(deadline);
+                deadline = deadline.toString();
+
+                console.log('--------------------------------');
+                console.log('Project Address: ' + pAddr);  
+                console.log(' - FundHub Address: ' + fundHubAddr);
+                console.log(' - Owner Address: ' + ownerAddr);
+                console.log(' - Deadline: ' + deadline);
+                console.log(' - Target Funding: ' + targetFundsEther);
+                console.log(' - Total Funding: ' + totalFundsEther);
+
+                return true;
+              }).catch(errorFunction);
+            });
+            $timeout(function () {
+              $scope.userStatus = projects.length + ' projects listed in console!';
+            });
+          }).catch(errorFunction);
+    }                             
 
 }]);
 
-// Create
-// browse
-// contribute
+// TODO: Sort out r/w project address in ui

@@ -47,24 +47,24 @@ contract FundingHub {
     db.indexedAddresses.length = db.indexedAddresses.length - 1; // TODO: Make sure this works!
   }
 
-  // TODO: Remove project if refund/payout from DS?
-
-  // *******************
-  //    Constructor
-  function FundingHub(uint currentTimeUnixTimestamp) {
-    diff_UnixTime_BCTime_ = int(currentTimeUnixTimestamp) - int(block.timestamp);
+  function getProjects_ProjectDB (ProjectDB storage db) private returns (address[]) {
+    return db.indexedAddresses;
   }
+
+  // TODO: Remove project if refund/payout from DS?
 
   // *******************
   //      Storage
   ProjectDB private projectDB_;
   int private diff_UnixTime_BCTime_;
-  
+
   // *****************
   // Public functions
 
-  //event E_newProject(address indexed projectOwner, address projectAddress);
-  event E_newProject(address yo);
+  //    Constructor
+  function FundingHub(uint currentTimeUnixTimestamp) {
+    diff_UnixTime_BCTime_ = int(currentTimeUnixTimestamp) - int(block.timestamp);
+  }
 
   // This function:
   //   * allows a user to add a new project to the FundingHub. 
@@ -80,9 +80,10 @@ contract FundingHub {
     Project project = new Project(owner, targetFundingWei, deadlineBlockchainTimestamp);
 
     insertProjectDB(projectDB_, project);
-    E_newProject(project);
+
+    E_createProject(owner, project);
     return project;
-  }
+  } event  E_createProject(address projectOwner, address projectAddress); // TODO: Rely on tx address instead of project owner?
 
   // This function
   //  * allows users to contribute to a Project identified by its address
@@ -91,23 +92,40 @@ contract FundingHub {
     payable
     isAddressValid(projectAddress)
     isAddressValid(contributor)
-    returns (bool contribution)
+    returns (bool contributionSuccessful)
   {
     Project project = Project(projectAddress);
-    bool isValid = isMemberProjectDB(projectDB_, project);
+    bool projectIsValid = isMemberProjectDB(projectDB_, project);
     bool projectEnd;
 
-    if (!isValid) return isValid;  // TODO: Better naming here?
+    if (!projectIsValid) return projectIsValid;  // TODO: Better naming here?
 
-    projectEnd = project.fund(contributor, msg.value);
+    // Send everything to project and let project.fund take care of redistribution 
+    projectEnd = project.fund.value(msg.value)(contributor, msg.value);
     if (projectEnd)
       deleteProjectDB(projectDB_, project);
 
-    return isValid;
+    E_contribute(projectIsValid);
+    return projectIsValid;
+  } event  E_contribute(bool contributionSuccessful); 
+
+  // TODO: Make this const?
+  // 0,0 retreives all
+  // 1,10 retreives first 10
+  function browse() constant
+    returns (address[]) {
+    return getProjects_ProjectDB(projectDB_);
   }
 
+  
   // *****************
   // Private functions
+
+  function sendTo(address recipient, uint bal) private {
+    if (bal == 0) return;                // NOTE: Consider optimization of removing this line during a map.
+    if (!recipient.send(bal)) throw;
+  }
+
 
   // y = f(x) = x + (y - x)
   function toUnixTime(uint bcTimestamp) private returns (uint) {
@@ -180,10 +198,9 @@ contract Project {
   // *******************
   //      Storage
   uint private deadline_;
+  uint private targetFundsWei_;
   address private owner_;
   address private fundhubAddress_;
-  uint private targetFundsWei_;
-  uint private totalFundsWei_;  
   ContributorsFunds private contributorsDB_;
 
   function Project ( address owner
@@ -191,6 +208,8 @@ contract Project {
                    , uint deadlineBlockchainTimestamp)
     isAddressValid(owner)
   {
+    owner_ = owner;
+    targetFundsWei_ = targetFundingWei;
     fundhubAddress_ = msg.sender;
     deadline_ = deadlineBlockchainTimestamp;
   }
@@ -201,14 +220,15 @@ contract Project {
   // Called when FundingHub gets contribution (fn: contribute)
   // Returns if project ended or not
   function fund(address contributor, uint fundsWei)
+    payable
     isFundingHubAddress(msg.sender)
     isAddressValid(contributor)
     isEnoughFunds(fundsWei)
     returns (bool)
   {
-    bool metGoal = (fundsWei + totalFundsWei_) >= targetFundsWei_;
+    bool metGoal = this.balance >= targetFundsWei_;
     bool atTimeLimit = block.timestamp >= deadline_;
-    uint leftOverFunds = metGoal ? fundsWei + totalFundsWei_ - targetFundsWei_  // Rectify
+    uint leftOverFunds = metGoal ? this.balance - targetFundsWei_  // Rectify
                                  : 0;   
     bool projectEnd = metGoal || atTimeLimit;
 
@@ -224,9 +244,14 @@ contract Project {
     return projectEnd;
   }
   // TODO: End project. selfdestruct etc
-  function getProjectInfo () returns (address fundinghub, address owner, int secondsToDeadline, uint targetFunds, uint totalFunds) {
-    return (fundhubAddress_, owner_, int(deadline_) - int(now), targetFundsWei_, totalFundsWei_);
+  function getProjectInfo () constant
+    returns (address fundinghub, address owner, int secondsToDeadline, uint targetFunds, uint totalFunds)
+  {
+    return (fundhubAddress_, owner_, int(deadline_) - int(now), targetFundsWei_, this.balance);
   }
+
+  // TODO: Account for timezone
+  // TODO: Cleanup code
 
   // ***********************
   // Helper functions
