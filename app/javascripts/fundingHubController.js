@@ -125,7 +125,6 @@ app.controller("fundingHubController", [ '$scope', '$location', '$http', '$q', '
               var p = Project.at(pAddr);
               return p.getProjectInfo();
             });
-// <qswz> then foos.map((fi, i)=>[fi, bars[i]]) // zip
             return Promise.all(infoProjects).map(function(info, i){ return [projects[i]].concat(info);});  
           })
           .then(function (infoProjects){
