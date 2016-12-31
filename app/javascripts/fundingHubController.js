@@ -93,7 +93,6 @@ app.controller("fundingHubController", [ '$scope', '$location', '$http', '$q', '
         });
         return;
       }
-
         
       contributionSuccessful = result['args']['contributionSuccessful'];
       var msg_ = contributionSuccessful ? 'successful!' : 'failed!';

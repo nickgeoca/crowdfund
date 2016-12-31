@@ -236,10 +236,10 @@ contract Project {
     sendTo(contributor, leftOverFunds);
     addFundsToContributor(contributorsDB_, contributor, fundsWei - leftOverFunds);
 
-    if (metGoal)
-      payout();
-    else if (atTimeLimit)
+    if (atTimeLimit)
       refund();
+    else if (metGoal)
+      payout();
 
     return projectEnd;
   }
@@ -271,7 +271,7 @@ contract Project {
   // sends all individual contributions back to the respective contributor
   function refund() private {
     mapContributorFunds(contributorsDB_, sendTo);
-    // TODO:   PUT EVENT HERE STATING WHAT WAS/WASN't SEND BACK'; AMEN
+    // TODO: Put event here stating what was (or wasn't if there is such a bug) sent back
   }
 
   function sendTo(address recipient, uint bal) private {
