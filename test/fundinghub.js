@@ -68,10 +68,7 @@ contract('FundingHub', function(accounts_) {
               setTimeout(function() {
                   _contribute(project1, accounts[0], accounts[0], 1000, function(contributionSuccessful) {
                       assert.equal(true, contributionSuccessful, 'Contribution not succesful.');
-                      setTimeout(function(){
-                                               assert.equal(true, false, web3.eth.getBalance(accountA).toString(10));
-                                           }, 6000);
-                      // testBalances(0, 'Refunded Accounts State - ', project1, accountA, accountB, balanceProject1_refundedAccountsState, balanceA_refundedAccountsState, balanceB_refundedAccountsState, done);
+                      testBalances(0, 'Refunded Accounts State - ', project1, accountA, accountB, balanceProject1_refundedAccountsState, balanceA_refundedAccountsState, balanceB_refundedAccountsState, done);
                   });
               }, 4000);
 
