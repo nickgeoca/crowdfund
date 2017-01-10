@@ -20,16 +20,16 @@ This project uses:
 
 ### Running the code
 #### Deploy the FundHub contract
- * cd <project>
+ * cd project-folder
  * truffle deploy
 
 #### Test script
- * cd <project>
+ * cd project-folder
  * testrpc -a 3  # Terminal 1
  * truffle test  # Terminal 2
 
 #### Build the interface
- * cd <project>
+ * cd project-folder
  * truffle build
 
 ### TODO
