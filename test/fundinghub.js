@@ -5,13 +5,12 @@ var accounts = 0;
 contract('FundingHub', function(accounts_) {
   var project1 = 0;
   accounts = accounts_
-
-  it("should retrieve zero projects if none put in", function() {
+  it("should retrieve zero projects if none put in", function(done) {
     var fundhub = FundingHub.deployed();
 
     return fundhub.browse().then(function(projects) {
       assert.equal(projects.length, 0, '1 or more projects are present when 0 where inserted');
-    })
+    }).then(done).catch(function(error){done(error);});
   });
   it("should create a new project with correct storage values", function(done) {
     var fundhub = FundingHub.deployed();
@@ -21,22 +20,33 @@ contract('FundingHub', function(accounts_) {
     var projectDuration = 4; // seconds
     var deadline = Math.round(+new Date()/1000) + projectDuration;
 
-    fundhub.E_createProject().watch(function (error, result) {
-      var projectAddress = result['args']['projectAddress'];
-      project1 = projectAddress;
-      _getProjectInfo(projectAddress, function (fundHubAddrActual, ownerAddrActual, secondsToDeadlineActual, targetFundsWeiActual, totalFundsWeiActual) {
-        assert.equal(fundHubAddrActual, fundhub.address, 'Created project\'s Fundhub address does not match');
-        assert.equal(ownerAddrActual, owner, 'Created project\'s owner address does not match');
-        assert.equal(Math.abs(secondsToDeadlineActual - projectDuration) < 5, true, 'Created projects deadline does not match');
-        assert.equal(targetFundsWeiActual, targetFundingWei, 'Created project\'s target fund does not match - ' + targetFundsWeiActual + ' - ' + targetFundingWei);
-        assert.equal(totalFundsWeiActual, web3.toWei(0,'ether'), 'Created project\'s balance is not 0 - is ' + totalFundsWeiActual);
+    return fundhub.createProject.sendTransaction(owner, targetFundingWei, deadline).then(function (txAddr) {
+      var event = fundhub.E_createProject();
+      event.watch(function(error, result){ 
+        event.stopWatching();
+        if (error) done(error);
+        project1 = result['args']['projectAddress'];
       });
-    });
-
-    fundhub.createProject(owner, targetFundingWei, deadline).then(function (txAddr) {;}).catch(function(error){assert.equal(0,1,'Fail: ' + error);});
-    setTimeout(done, 1500);
+    }).then(
+      delay(500)
+    ).then(function(){
+        return Project.at(project1).getProjectInfo.call();
+    }).then(function(params) {
+      [fundHubAddrActual, ownerAddrActual, secondsToDeadlineActual, targetFundsWeiActual, totalFundsWeiActual] = params;
+      assert.equal(fundHubAddrActual, fundhub.address, 'Created project\'s Fundhub address does not match');
+      assert.equal(ownerAddrActual, owner, 'Created project\'s owner address does not match');
+      assert.equal(Math.abs(secondsToDeadlineActual - projectDuration) < 5, true, 'Created projects deadline does not match');
+      assert.equal(targetFundsWeiActual, targetFundingWei, 'Created project\'s target fund does not match - ' + targetFundsWeiActual + ' - ' + targetFundingWei);
+      assert.equal(totalFundsWeiActual, web3.toWei(0,'ether'), 'Created project\'s balance is not 0 - is ' + totalFundsWeiActual);
+    }).then(done).catch(function(error){done(error);});
   });
   it("refund users if past target date and under funded", function(done) {
+    var testBalance = function(account, accountExpectedBalance, errorMsgPrefix) {
+      var actualBalance = web3.eth.getBalance(account).toString(10);
+      var expectedBalance = accountExpectedBalance.toString(10);
+      assert.equal(actualBalance, expectedBalance, errorMsgPrefix);
+    }
+
     var fundhub = FundingHub.deployed();
     var accountA = accounts[1];
     var accountB = accounts[2];
@@ -67,24 +77,10 @@ contract('FundingHub', function(accounts_) {
         testBalance(project1, balanceProject1_refundedAccountsState, 'Refunded Accounts State - project balance does not match');
         testBalance(accountA, balanceA_refundedAccountsState, 'Refunded Accounts State - accountA balance does not match');
         testBalance(accountB, balanceB_refundedAccountsState, 'Refunded Accounts State - accountB balance does not match');
-        done();
-      });
+      }).then(done).catch(function(error){done(error);});
   });
 });
 
-var testBalance = function(account, accountExpectedBalance, errorMsgPrefix) {
-  var actualBalance = web3.eth.getBalance(account).toString(10);
-  var expectedBalance = accountExpectedBalance.toString(10);
-  assert.equal(actualBalance, expectedBalance, errorMsgPrefix);
-}
-
-var _getProjectInfo = function (projectAddress, fn) {
-  Project.at(projectAddress).getProjectInfo()
-    .then(function (params) {
-      [fundHubAddrActual, ownerAddrActual, secondsToDeadlineActual, targetFundsWeiActual, totalFundsWeiActual] = params;
-      fn(fundHubAddrActual, ownerAddrActual, secondsToDeadlineActual, targetFundsWeiActual, totalFundsWeiActual);
-    }).catch(function (error) { assert.ifError(error);});
-};
 
 function delay(milliseconds) {
   return function(result) {
