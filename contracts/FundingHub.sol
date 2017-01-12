@@ -203,6 +203,10 @@ contract Project {
   address private fundhubAddress_;
   ContributorsFunds private contributorsDB_;
 
+  
+  // Fallback function
+  function() { throw; }
+
   function Project ( address owner
                    , uint targetFundingWei
                    , uint deadlineBlockchainTimestamp)
