@@ -1,6 +1,6 @@
 [https://github.com/nickgeoca/crowdfund](https://github.com/nickgeoca/crowdfund)
 
-Feel free to email me with questions/comments at <github-username> at gmail dot com
+Feel free to email me with questions/comments at nickgeoca at gmail dot com
 
 # Crowdfunding DAPP - Ethereum
 ### Overview
