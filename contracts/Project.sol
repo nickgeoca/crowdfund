@@ -1,5 +1,7 @@
 pragma solidity 0.4.6;
 
+import "Set.sol";
+
 // TODO: Put Project in own file 
 
 // TODO: What to do after payout/refund?
@@ -8,44 +10,7 @@ pragma solidity 0.4.6;
 // c Delete mappings
 
 contract Project {
-
-  // *******************
-  //      Types
-
-  // Iterable map. Add only. Unique addresses.
-  // TODO: Change names in data type below
-  struct ContributorsFunds {
-    mapping (address => uint) contributorToFunds;
-    address[] indexedContributors;
-  }
-
-
-  function addFundsToContributor(ContributorsFunds storage d, address contrib, uint funds) private {
-    bool isNew = d.contributorToFunds[contrib] == 0;
-
-    if (isNew) 
-      d.indexedContributors.push(contrib);
-
-    d.contributorToFunds[contrib] = d.contributorToFunds[contrib] + funds;
-  }
-
-  // TODO: param f: (address addr, uint funds)
-  function mapContributorFunds ( ContributorsFunds storage d
-                               , function (address, uint) f)
-    private
-  {
-    uint i;
-    uint end = d.indexedContributors.length; 
-    uint funds;
-    address addr;
-
-    for (i = 0; i < end; i++) {
-      addr = d.indexedContributors[i];
-      funds = d.contributorToFunds[addr];
-
-      f(addr, funds);
-    }
-  }
+  using Set for *;
 
   // *******************
   //      Storage
@@ -53,7 +18,7 @@ contract Project {
   uint private targetFundsWei_;
   address private owner_;
   address private fundhubAddress_;
-  ContributorsFunds private contributorsDB_;
+  Set.Data private contributorsDB_;
 
   
   // Fallback function
@@ -87,10 +52,13 @@ contract Project {
     uint leftOverFunds = metGoal ? this.balance - targetFundsWei_  // Rectify
                                  : 0;   
     bool projectEnd = metGoal || atTimeLimit;
+    uint contributorsCurrentFunding = Set.get(contributorsDB_, contributor);
 
     // Send any leftovers back and add contribution 
     sendTo(contributor, leftOverFunds);
-    addFundsToContributor(contributorsDB_, contributor, fundsWei - leftOverFunds);
+    Set.insert( contributorsDB_
+              , contributor
+              , contributorsCurrentFunding + fundsWei - leftOverFunds);
 
     if (atTimeLimit)
       refund();
@@ -99,6 +67,7 @@ contract Project {
 
     return projectEnd;
   }
+  
   // TODO: End project. selfdestruct etc
   function getProjectInfo () constant
     returns (address fundinghub, address owner, int secondsToDeadline, uint targetFunds, uint totalFunds)
@@ -114,6 +83,7 @@ contract Project {
   // Sends all funds received to owner of the project
   function payout() private {
     sendTo(owner_, this.balance);
+    suicide(owner_);
     // TODO: PUT EVENT HERE 
   }
 
@@ -126,13 +96,17 @@ contract Project {
 
   // sends all individual contributions back to the respective contributor
   function refund() private {
-    mapContributorFunds(contributorsDB_, sendTo);
-    // TODO: Put event here stating what was (or wasn't if there is such a bug) sent back
+    Set.map(contributorsDB_, sendToUnsafe);
+    suicide(owner_);
   }
 
   function sendTo(address recipient, uint bal) private {
     if (bal == 0) return;                // NOTE: Consider optimization of removing this line during a map.
     if (!recipient.send(bal)) throw;
+  }
+
+  function sendToUnsafe(address recipient, uint bal) private {
+    recipient.send(bal);
   }
 
   
